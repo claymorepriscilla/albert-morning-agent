@@ -64,7 +64,7 @@ func main() {
 	defer geminiClient.Close()
 
 	lineClient := line.NewClient(cfg.LineAccessToken, cfg.LineUserID, cfg.Broadcast)
-	today := time.Now().Format("02/01/2006")
+	today := time.Now().In(time.FixedZone("Asia/Bangkok", 7*60*60)).Format("02/01/2006")
 
 	for _, b := range dailyBriefings {
 		process(ctx, geminiClient, lineClient, b, today)
