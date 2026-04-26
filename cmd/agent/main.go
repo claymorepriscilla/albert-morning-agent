@@ -8,6 +8,7 @@ import (
 
 	"github.com/claymorepriscilla/albert-morning-agent/internal/config"
 	"github.com/claymorepriscilla/albert-morning-agent/internal/gemini"
+	"github.com/claymorepriscilla/albert-morning-agent/internal/gold"
 	"github.com/claymorepriscilla/albert-morning-agent/internal/line"
 	"github.com/claymorepriscilla/albert-morning-agent/internal/news"
 )
@@ -70,11 +71,48 @@ func main() {
 		process(ctx, geminiClient, lineClient, b, today)
 	}
 
+	processGold(ctx, geminiClient, lineClient, today)
+
 	if d := time.Now().Day(); d == 1 || d == 16 {
 		process(ctx, geminiClient, lineClient, lotteryBriefing, today)
 	}
 
 	log.Println("Morning Agent completed.")
+}
+
+// processGold fetches Thai gold prices + news summary and sends them as a single message.
+func processGold(ctx context.Context, g *gemini.Client, l *line.Client, today string) {
+	log.Printf("[start] ราคาทองคำ")
+
+	price, err := gold.FetchPrice()
+	if err != nil {
+		log.Printf("[skip]  ราคาทองคำ — fetch price: %v", err)
+		return
+	}
+
+	headlines, err := news.FetchRSS(
+		"https://news.google.com/rss/search?q=gold+price+thailand+%E0%B8%97%E0%B8%AD%E0%B8%87%E0%B8%84%E0%B8%B3&hl=th&gl=TH&ceid=TH:th",
+		rssLimit,
+	)
+	if err != nil {
+		log.Printf("[skip]  ราคาทองคำ — fetch news: %v", err)
+		return
+	}
+
+	summary, err := g.Summarize("ราคาทองคำและแนวโน้ม", headlines)
+	if err != nil {
+		log.Printf("[skip]  ราคาทองคำ — summarize: %v", err)
+		return
+	}
+
+	msg := gold.FormatMessage(price, summary, today)
+
+	if err := l.Send(msg); err != nil {
+		log.Printf("[skip]  ราคาทองคำ — LINE: %v", err)
+		return
+	}
+
+	log.Printf("[done]  ราคาทองคำ")
 }
 
 // process fetches, summarises, and sends one briefing.
