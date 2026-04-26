@@ -24,10 +24,17 @@ profile.cov
 go.work
 go.work.sum
 
-# env file
+# Environment files
 .env
+.env.*
+
+# Compiled binary
+agent
+agent.exe
 
 # Editor/IDE
-# .idea/
-# .vscode/
+.idea/
+.vscode/
+*.swp
+*.swo
 .DS_Store
