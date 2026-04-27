@@ -45,6 +45,6 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
           LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
-          LINE_BROADCAST: "false"
+          LINE_BROADCAST: "true"
           LOTTERY_ONLY: ${{ steps.mode.outputs.lottery_only }}
         run: go run ./cmd/agent

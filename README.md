@@ -7,19 +7,21 @@
 ## ภาพรวมระบบ
 
 ```
-Google News RSS
-      │
-      ▼
-  news.FetchRSS          ← ดึงพาดหัวข่าวล่าสุด (สูงสุด 10 ข่าวต่อหัวข้อ)
-      │
-      ▼
-  gemini.Summarize        ← ส่ง prompt ไปที่ Groq API (LLaMA 3.3 70B)
-      │                      → ได้สรุปเป็นภาษาไทย ไม่เกิน 5 ประเด็น
-      ▼
-  line.Send               ← ส่งข้อความเข้า LINE
-      │
-      ├── Push mode      → ส่งหาผู้ใช้คนเดียว (LINE_USER_ID)
-      └── Broadcast mode → ส่งหาทุกคนที่ Add บอทเป็นเพื่อน
+Scheduler (GitHub Actions / local cron)
+        │
+        ▼
+    cmd/agent (main.go)
+        │  -- โหลด config (internal/config.Load)
+        ▼
+  For each topic (AI, SET, Nasdaq, Lottery when applicable):
+    ├─ news.FetchRSS       ← ดึงพาดหัวข่าวจาก Google News RSS (สูงสุด N ข้อ)
+    ├─ gold.Fetcher        ← (สำหรับหัวข้อทอง/การเงินถ้ามี) ดึงข้อมูลราคา/ตัวเลข
+    ├─ gemini.Summarize    ← ส่ง prompt ไปยัง Groq API (LLaMA 3.3 70B) เพื่อสรุป
+    └─ line.Send           ← ส่งข้อความเข้า LINE (Push หรือ Broadcast ตาม config)
+
+ข้อควรทราบ:
+- `internal/config` โหลดค่าจาก env (รองรับ `.env` สำหรับ local dev)
+- Error handling: งานแต่ละหัวข้อทำแบบ best-effort — log แล้วข้ามถ้าพบปัญหา
 ```
 
 ---
@@ -58,20 +60,32 @@ Google News RSS
 albert-morning-agent/
 ├── cmd/
 │   └── agent/
-│       └── main.go          # Entry point — orchestrate ทั้งกระบวนการ
+│       └── main.go                  # Entry point — orchestrate ทั้งกระบวนการ
 ├── internal/
 │   ├── config/
-│   │   └── config.go        # โหลด env vars และ validate
+│   │   ├── config.go
+│   │   └── config_test.go
 │   ├── news/
-│   │   └── fetcher.go       # ดึง RSS feed และแปลงเป็น list พาดหัว
+│   │   ├── fetcher.go
+│   │   └── fetcher_test.go
 │   ├── gemini/
-│   │   └── client.go        # เรียก Groq API (LLaMA 3.3 70B) เพื่อสรุปข่าว
+│   │   ├── client.go
+│   │   ├── client_test.go
+│   │   └── export_test.go
+│   ├── gold/
+│   │   ├── fetcher.go
+│   │   ├── fetcher_test.go
+│   │   └── export_test.go
 │   └── line/
-│       └── client.go        # ส่งข้อความผ่าน LINE Messaging API
+│       ├── client.go
+│       ├── client_test.go
+│       └── export_test.go
 ├── .github/
 │   └── workflows/
-│       └── morning.yml      # GitHub Actions — รันทุกวัน 7:00 น. (Bangkok)
-├── .env                     # env vars สำหรับ local dev (ห้าม commit)
+│       └── morning.yml              # GitHub Actions — รันตาม schedule
+├── LICENSE
+├── README.md
+├── .env                              # local dev only — อย่า commit
 ├── go.mod
 └── go.sum
 ```
@@ -97,6 +111,10 @@ LINE_USER_ID=Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
 **Broadcast mode** — ส่งหาทุกคนที่ Add บอทเป็นเพื่อน ไม่ต้องระบุ `LINE_USER_ID`
+## License
+
+This project is released under the MIT License — see [LICENSE](LICENSE) for details.
+
 
 ```env
 LINE_BROADCAST=true
@@ -155,6 +173,13 @@ go run ./cmd/agent
 | `LINE_USER_ID` | User ID ผู้รับ (เฉพาะ Push mode) |
 
 > `LINE_BROADCAST` ไม่ต้องเก็บใน Secrets เพราะไม่ใช่ข้อมูลลับ — ตั้งตรงใน workflow file ได้เลย
+
+### CI / GitHub Actions notes
+
+- This repository includes a scheduled workflow at [.github/workflows/morning.yml](.github/workflows/morning.yml) that runs the agent daily.
+- The workflow now runs `golangci-lint` as part of the job to catch style, unused code and common security issues. Please ensure linter issues are fixed before merging.
+- GitHub Actions runners are migrating to Node.js 24; the workflow opts in to Node.js 24 by setting `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true`. If your actions require a different opt-in strategy, adjust the workflow accordingly.
+- Required GitHub Secrets: `GROQ_API_KEY`, `LINE_CHANNEL_ACCESS_TOKEN`, `LINE_USER_ID` (for Push mode). Do NOT store credentials in the repository or `.env`.
 
 ### รันทดสอบด้วยตนเอง
 
