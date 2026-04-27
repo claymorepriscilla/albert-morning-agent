@@ -35,6 +35,7 @@ Scheduler (GitHub Actions / local cron)
 | ข่าว AI และเทคโนโลยี | Google News (ค้นหา: artificial intelligence AI) |
 | หุ้นไทย (SET) | Google News (ค้นหา: SET index thailand stock) |
 | หุ้นอเมริกา (Nasdaq / S&P500) | Google News (ค้นหา: stock market nasdaq S&P500) |
+| ทองคำ (Gold) | Google News (ค้นหา: ราคาทองคำ ราคาทองคำไทย) |
 
 ### หัวข้อพิเศษ (เฉพาะวันที่ 1 และ 16 ของเดือน)
 
@@ -160,7 +161,16 @@ go run ./cmd/agent
 
 ## การ Deploy ด้วย GitHub Actions
 
-บอทรันอัตโนมัติผ่าน GitHub Actions ทุกวัน 7:00 น. เวลาไทย (00:00 UTC)
+บอทรันอัตโนมัติผ่าน GitHub Actions ทุกวันตามตารางด้านล่าง:
+
+- `00:00 UTC` (07:00 Bangkok) — Morning briefing ปกติ สำหรับหัวข้อ AI / หุ้น / ทองคำ
+- `08:00 UTC` (15:00 Bangkok) — Lottery check run (หัวข้อผลหวยไทย)
+
+Workflow ใช้ตัวตรวจสอบเวลา (`Detect run mode`) เพื่อกำหนดว่าการรันเป็น "lottery only" หรือไม่ โดยตั้งค่า environment variable `LOTTERY_ONLY=true` สำหรับรันที่เป็น lottery-only. ในไฟล์ workflow (`.github/workflows/morning.yml`) คนรันจะเห็นขั้นตอนที่ตั้ง `LOTTERY_ONLY` ให้โดยอัตโนมัติตามชั่วโมง UTC.
+
+ถ้าต้องการทดสอบแบบ manual ผ่าน **Run workflow** สามารถใช้ `workflow_dispatch` และตั้งค่า `LOTTERY_ONLY=true` เป็น input หรือกำหนด `LOTTERY_ONLY` ใน environment ของขั้นตอน `Run Morning Agent` เพื่อจำลองการรันตรวจหวย
+
+ข้อควรระวัง: การรัน lottery-only ยังคงต้องมี `GROQ_API_KEY` และ `LINE_CHANNEL_ACCESS_TOKEN` ใน Secrets เพราะขั้นตอนสรุปข้อความและส่ง LINE อาจถูกเรียกใช้เหมือนกัน
 
 ### ตั้งค่า GitHub Secrets
 
@@ -192,7 +202,9 @@ go run ./cmd/agent
 ```
 1. โหลด config จาก env vars และ validate ความครบถ้วน
 
-2. สำหรับแต่ละหัวข้อ (AI / หุ้นไทย / หุ้นอเมริกา):
+2. สำหรับการรันปกติ (เช้า — scheduled run):
+   - จะวน `dailyBriefings` ได้แก่ ข่าว AI, หุ้นไทย, หุ้นอเมริกา แล้วตามด้วยการประมวลผลราคาทองคำ (`processGold`)
+   - ทองคำ: `internal/gold.Fetcher` จะดึงราคาทองจากแหล่งราคาและพาดหัวข่าวที่เกี่ยวข้อง แล้วจัดส่งเป็นข้อความเดียว
    a. FetchRSS  — ดึงพาดหัวข่าวล่าสุดสูงสุด 10 ข้อจาก Google News RSS
    b. Summarize — ส่ง prompt ไปที่ Groq API (LLaMA 3.3 70B)
                   prompt: "สรุปข่าว{topic} กระชับ ไม่เกิน 5 ประเด็น ใช้รูปแบบ 📌"
@@ -200,8 +212,11 @@ go run ./cmd/agent
 
    หากเกิด error ในขั้นตอนใด จะ log และข้ามไปหัวข้อถัดไป (best-effort)
 
-3. ถ้าวันที่ปัจจุบันคือวันที่ 1 หรือ 16 ของเดือน:
-   → ทำซ้ำขั้นตอนเดิมสำหรับหัวข้อผลหวยไทย
+3. สำหรับการรันตรวจหวย (lottery-only, บ่าย):
+   - มี scheduled run แยกที่เรียกด้วย `LOTTERY_ONLY=true` (workflow ตั้งค่าอัตโนมัติตามชั่วโมง)
+   - ในโหมดนี้โปรแกรมเรียก `processIfNewsFound` สำหรับ `lotteryBriefing` ซึ่งจะ:
+     - ดึง RSS ของผลหวยไทย และจะส่งเฉพาะเมื่อมีข่าว/หัวข้อที่เกี่ยวข้อง ("no recent news" จะถูกข้าม)
+     - วิธีนี้ทำให้ไม่ต้อง hardcode วันที่ — ระบบพึ่งพา RSS เพื่อรู้ว่าเมื่อไหร่มีผลหวย
 
 4. จบการทำงาน — log "Morning Agent completed."
 ```
