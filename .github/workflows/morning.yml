@@ -2,8 +2,10 @@ name: Morning Agent
 
 on:
   schedule:
-    # 7:00 AM Bangkok time (UTC+7) = 00:00 UTC
+    # 7:00 AM Bangkok time (UTC+7) = 00:00 UTC — daily briefing
     - cron: "0 0 * * *"
+    # 3:00 PM Bangkok time (UTC+7) = 08:00 UTC — lottery result check (every day, RSS filter decides)
+    - cron: "0 8 * * *"
   workflow_dispatch: # กดรันเองได้ตอนทดสอบ
 
 jobs:
@@ -19,10 +21,27 @@ jobs:
         with:
           go-version: "1.22"
 
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v4
+        with:
+          version: v1.58.0
+          args: --timeout=5m
+
+      - name: Detect run mode
+        id: mode
+        run: |
+          HOUR=$(date -u +%H)
+          if [ "$HOUR" = "08" ]; then
+            echo "lottery_only=true" >> $GITHUB_OUTPUT
+          else
+            echo "lottery_only=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Run Morning Agent
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
           LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
-          LINE_BROADCAST: "true"
+          LINE_BROADCAST: "false"
+          LOTTERY_ONLY: ${{ steps.mode.outputs.lottery_only }}
         run: go run ./cmd/agent

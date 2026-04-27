@@ -3,11 +3,14 @@ package news
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/mmcdole/gofeed"
 )
 
-// FetchRSS fetches up to limit headlines from an RSS feed URL.
+const maxAge = 24 * time.Hour
+
+// FetchRSS fetches up to limit headlines published within the last 24 hours from an RSS feed URL.
 func FetchRSS(url string, limit int) (string, error) {
 	fp := gofeed.NewParser()
 	feed, err := fp.ParseURL(url)
@@ -15,10 +18,15 @@ func FetchRSS(url string, limit int) (string, error) {
 		return "", fmt.Errorf("parse RSS feed: %w", err)
 	}
 
+	cutoff := time.Now().Add(-maxAge)
 	var lines []string
-	for i, item := range feed.Items {
-		if i >= limit {
+	for _, item := range feed.Items {
+		if len(lines) >= limit {
 			break
+		}
+		// Skip articles older than 24 hours when publish date is available.
+		if item.PublishedParsed != nil && item.PublishedParsed.Before(cutoff) {
+			continue
 		}
 		lines = append(lines, "- "+item.Title)
 	}

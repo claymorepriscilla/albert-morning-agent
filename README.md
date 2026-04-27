@@ -126,9 +126,9 @@ cd albert-morning-agent
 **2. สร้างไฟล์ `.env`**
 
 ```env
-GROQ_API_KEY=gsk_xxxxxxxxxxxxxxxxxxxx
-LINE_CHANNEL_ACCESS_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxx
-LINE_USER_ID=Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+GROQ_API_KEY=YOUR_GROQ_API_KEY_HERE
+LINE_CHANNEL_ACCESS_TOKEN=YOUR_LINE_CHANNEL_ACCESS_TOKEN_HERE
+LINE_USER_ID=YOUR_LINE_USER_ID_HERE
 LINE_BROADCAST=false
 ```
 
