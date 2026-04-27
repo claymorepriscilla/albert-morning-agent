@@ -7,7 +7,7 @@ import (
 	"net/http"
 )
 
-const (
+var (
 	pushURL      = "https://api.line.me/v2/bot/message/push"
 	broadcastURL = "https://api.line.me/v2/bot/message/broadcast"
 )

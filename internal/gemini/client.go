@@ -9,10 +9,9 @@ import (
 	"net/http"
 )
 
-const (
-	groqEndpoint = "https://api.groq.com/openai/v1/chat/completions"
-	groqModel    = "llama-3.3-70b-versatile"
-)
+var groqEndpoint = "https://api.groq.com/openai/v1/chat/completions"
+
+const groqModel = "llama-3.3-70b-versatile"
 
 type Client struct {
 	apiKey string
@@ -29,14 +28,35 @@ func NewClient(ctx context.Context, apiKey string) (*Client, error) {
 
 func (c *Client) Close() {}
 
-func (c *Client) Summarize(topic, newsText string) (string, error) {
-	prompt := fmt.Sprintf(
-		"คุณคือผู้ช่วยสรุปข่าว สรุปข่าว%sต่อไปนี้เป็นภาษาไทย\nกระชับ อ่านง่าย เลือกเฉพาะประเด็นสำคัญ ไม่เกิน 5 ข้อ\n\nข่าว:\n%s\n\nรูปแบบการตอบ:\n📌 ...\n📌 ...\n📌 ...",
-		topic, newsText,
+func (c *Client) Summarize(topic, newsText, today string) (string, error) {
+	systemPrompt := `คุณคือ "มอร์นิ่งบรีฟ" — นักข่าวมืออาชีพที่สรุปข่าวทุกเช้าให้คนไทยอ่านใน 30 วินาที
+
+บุคลิก:
+- กระชับ ตรงประเด็น ไม่อ้อมค้อม
+- ใช้ภาษาไทยที่อ่านง่าย ไม่เป็นทางการจนเกินไป
+- เลือกเฉพาะข่าวที่มีผลกระทบจริงๆ ต่อชีวิตประจำวันหรือการลงทุน
+- ถ้ามีตัวเลขสำคัญ (ราคา %, มูลค่า) ให้ใส่ไว้เสมอ
+- ใช้คำว่า "ล่าสุด" หรือ "ขณะนี้" แทนการระบุวันที่จากบทความ
+
+รูปแบบที่ต้องตอบ (ห้ามเพิ่มหรือลดรูปแบบนี้):
+📌 [ประเด็นสำคัญที่สุด — ใส่ตัวเลขถ้ามี]
+📌 [ประเด็นที่ 2]
+📌 [ประเด็นที่ 3]
+📌 [ประเด็นที่ 4]
+📌 [ประเด็นที่ 5 — ถ้าไม่มีให้ข้ามได้]`
+
+	userPrompt := fmt.Sprintf(
+		"วันนี้ %s — สรุปข่าว%s จากหัวข่าวเหล่านี้:\n\n%s",
+		today, topic, newsText,
 	)
+
 	reqBody, _ := json.Marshal(map[string]any{
-		"model":    groqModel,
-		"messages": []map[string]string{{"role": "user", "content": prompt}},
+		"model": groqModel,
+		"messages": []map[string]any{
+			{"role": "system", "content": systemPrompt},
+			{"role": "user", "content": userPrompt},
+		},
+		"temperature": 0.4,
 	})
 	req, err := http.NewRequestWithContext(c.ctx, http.MethodPost, groqEndpoint, bytes.NewReader(reqBody))
 	if err != nil {

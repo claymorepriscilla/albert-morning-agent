@@ -6,7 +6,7 @@ import (
 	"net/http"
 )
 
-const apiURL = "https://api.chnwt.dev/thai-gold-api/latest"
+var apiURL = "https://api.chnwt.dev/thai-gold-api/latest"
 
 // Price holds buy/sell prices for gold bar and gold jewelry.
 type Price struct {
@@ -63,11 +63,14 @@ func FetchPrice() (*Price, error) {
 
 // FormatMessage combines gold price and AI summary into a single LINE message.
 func FormatMessage(p *Price, summary, date string) string {
-	return fmt.Sprintf(
-		"🥇 *ราคาทองคำ* %s\n\nทองคำแท่ง\n  รับซื้อ: %s บาท\n  ขายออก: %s บาท\n\nทองรูปพรรณ\n  รับซื้อ: %s บาท\n  ขายออก: %s บาท\n\n%s",
+	base := fmt.Sprintf(
+		"🥇 *ราคาทองคำ* %s\n\nทองคำแท่ง\n  รับซื้อ: %s บาท\n  ขายออก: %s บาท\n\nทองรูปพรรณ\n  รับซื้อ: %s บาท\n  ขายออก: %s บาท",
 		date,
 		p.BarBuy, p.BarSell,
 		p.OrnamentBuy, p.OrnamentSell,
-		summary,
 	)
+	if summary == "" {
+		return base
+	}
+	return base + "\n\n" + summary
 }

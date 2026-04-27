@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"github.com/claymorepriscilla/albert-morning-agent/internal/config"
@@ -67,14 +68,14 @@ func main() {
 	lineClient := line.NewClient(cfg.LineAccessToken, cfg.LineUserID, cfg.Broadcast)
 	today := time.Now().In(time.FixedZone("Asia/Bangkok", 7*60*60)).Format("02/01/2006")
 
-	for _, b := range dailyBriefings {
-		process(ctx, geminiClient, lineClient, b, today)
-	}
-
-	processGold(ctx, geminiClient, lineClient, today)
-
-	if d := time.Now().Day(); d == 1 || d == 16 {
-		process(ctx, geminiClient, lineClient, lotteryBriefing, today)
+	if os.Getenv("LOTTERY_ONLY") == "true" {
+		// Afternoon run — check lottery results only (no hardcoded date, rely on 24h RSS filter).
+		processIfNewsFound(ctx, geminiClient, lineClient, lotteryBriefing, today)
+	} else {
+		for _, b := range dailyBriefings {
+			process(ctx, geminiClient, lineClient, b, today)
+		}
+		processGold(ctx, geminiClient, lineClient, today)
 	}
 
 	log.Println("Morning Agent completed.")
@@ -90,19 +91,21 @@ func processGold(ctx context.Context, g *gemini.Client, l *line.Client, today st
 		return
 	}
 
+	var summary string
 	headlines, err := news.FetchRSS(
 		"https://news.google.com/rss/search?q=gold+price+thailand+%E0%B8%97%E0%B8%AD%E0%B8%87%E0%B8%84%E0%B8%B3&hl=th&gl=TH&ceid=TH:th",
 		rssLimit,
 	)
-	if err != nil {
-		log.Printf("[skip]  ราคาทองคำ — fetch news: %v", err)
-		return
-	}
-
-	summary, err := g.Summarize("ราคาทองคำและแนวโน้ม", headlines)
-	if err != nil {
-		log.Printf("[skip]  ราคาทองคำ — summarize: %v", err)
-		return
+	switch {
+	case err != nil:
+		log.Printf("[warn]  ราคาทองคำ — fetch news: %v (sending price only)", err)
+	case headlines == "ไม่พบข่าว":
+		log.Printf("[warn]  ราคาทองคำ — no recent news, sending price only")
+	default:
+		summary, err = g.Summarize("ราคาทองคำและแนวโน้ม", headlines, today)
+		if err != nil {
+			log.Printf("[warn]  ราคาทองคำ — summarize: %v (sending price only)", err)
+		}
 	}
 
 	msg := gold.FormatMessage(price, summary, today)
@@ -113,6 +116,37 @@ func processGold(ctx context.Context, g *gemini.Client, l *line.Client, today st
 	}
 
 	log.Printf("[done]  ราคาทองคำ")
+}
+
+// processIfNewsFound is like process but skips silently when no recent headlines are found.
+// Used for event-driven briefings (e.g. lottery) where no news means the event hasn't happened yet.
+func processIfNewsFound(ctx context.Context, g *gemini.Client, l *line.Client, b briefing, today string) {
+	log.Printf("[start] %s", b.label)
+
+	headlines, err := news.FetchRSS(b.rssURL, rssLimit)
+	if err != nil {
+		log.Printf("[skip]  %s — fetch: %v", b.label, err)
+		return
+	}
+	if headlines == "ไม่พบข่าว" {
+		log.Printf("[skip]  %s — no recent news found", b.label)
+		return
+	}
+
+	summary, err := g.Summarize(b.topic, headlines, today)
+	if err != nil {
+		log.Printf("[skip]  %s — summarize: %v", b.label, err)
+		return
+	}
+
+	msg := fmt.Sprintf("%s *%s* ประจำวัน %s\n\n%s", b.emoji, b.label, today, summary)
+
+	if err := l.Send(msg); err != nil {
+		log.Printf("[skip]  %s — LINE: %v", b.label, err)
+		return
+	}
+
+	log.Printf("[done]  %s", b.label)
 }
 
 // process fetches, summarises, and sends one briefing.
@@ -126,7 +160,7 @@ func process(ctx context.Context, g *gemini.Client, l *line.Client, b briefing, 
 		return
 	}
 
-	summary, err := g.Summarize(b.topic, headlines)
+	summary, err := g.Summarize(b.topic, headlines, today)
 	if err != nil {
 		log.Printf("[skip]  %s — summarize: %v", b.label, err)
 		return
