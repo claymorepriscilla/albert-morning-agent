@@ -99,7 +99,9 @@ func TestSend_BroadcastMode(t *testing.T) {
 			handler: func(w http.ResponseWriter, r *http.Request) {
 				body, _ := io.ReadAll(r.Body)
 				var payload map[string]any
-				json.Unmarshal(body, &payload)
+				if err := json.Unmarshal(body, &payload); err != nil {
+					t.Fatalf("invalid JSON payload: %v", err)
+				}
 				if _, hasTo := payload["to"]; hasTo {
 					http.Error(w, "broadcast must not have to field", http.StatusBadRequest)
 					return
