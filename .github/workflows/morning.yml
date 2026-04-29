@@ -6,7 +6,16 @@ on:
     - cron: "0 0 * * *"
     # 3:00 PM Bangkok time (UTC+7) = 08:00 UTC — lottery result check (every day, RSS filter decides)
     - cron: "0 8 * * *"
-  workflow_dispatch: # กดรันเองได้ตอนทดสอบ
+  workflow_dispatch:
+    inputs:
+      lottery_only:
+        description: 'Run lottery check only (skip morning briefing)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
 
 jobs:
   run-morning-agent:
@@ -33,8 +42,9 @@ jobs:
       - name: Detect run mode
         id: mode
         run: |
-          HOUR=$(date -u +%H)
-          if [ "$HOUR" = "08" ]; then
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "lottery_only=${{ inputs.lottery_only }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event.schedule }}" = "0 8 * * *" ]; then
             echo "lottery_only=true" >> $GITHUB_OUTPUT
           else
             echo "lottery_only=false" >> $GITHUB_OUTPUT

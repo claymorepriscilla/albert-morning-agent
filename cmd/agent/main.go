@@ -28,19 +28,19 @@ var dailyBriefings = []briefing{
 		emoji:  "🤖",
 		label:  "ข่าว AI",
 		topic:  "AI และเทคโนโลยี",
-		rssURL: "https://news.google.com/rss/search?q=artificial+intelligence+AI&hl=th&gl=TH&ceid=TH:th",
+		rssURL: "https://news.google.com/rss/search?q=artificial+intelligence+AI+when:1d&hl=th&gl=TH&ceid=TH:th",
 	},
 	{
 		emoji:  "🇹🇭",
 		label:  "หุ้นไทย",
 		topic:  "หุ้นไทย",
-		rssURL: "https://news.google.com/rss/search?q=SET+index+thailand+stock&hl=th&gl=TH&ceid=TH:th",
+		rssURL: "https://news.google.com/rss/search?q=%E0%B8%95%E0%B8%A5%E0%B8%B2%E0%B8%94%E0%B8%AB%E0%B8%A5%E0%B8%B1%E0%B8%81%E0%B8%97%E0%B8%A3%E0%B8%B1%E0%B8%9E%E0%B8%A2%E0%B9%8C+SET+%E0%B8%AB%E0%B8%B8%E0%B9%89%E0%B8%99%E0%B9%84%E0%B8%97%E0%B8%A2+when:1d&hl=th&gl=TH&ceid=TH:th",
 	},
 	{
 		emoji:  "🇺🇸",
 		label:  "หุ้นอเมริกา",
 		topic:  "หุ้นอเมริกา",
-		rssURL: "https://news.google.com/rss/search?q=stock+market+nasdaq+S%26P500&hl=en&gl=US&ceid=US:en",
+		rssURL: "https://news.google.com/rss/search?q=stock+market+nasdaq+S%26P500+when:6h&hl=en-US&gl=US&ceid=US:en",
 	},
 }
 
@@ -48,7 +48,7 @@ var lotteryBriefing = briefing{
 	emoji:  "🎰",
 	label:  "ผลหวยไทย",
 	topic:  "หวยไทย",
-	rssURL: "https://news.google.com/rss/search?q=ผลสลากกินแบ่งรัฐบาล+หวย&hl=th&gl=TH&ceid=TH:th",
+	rssURL: "https://news.google.com/rss/search?q=%E0%B8%9C%E0%B8%A5%E0%B8%AA%E0%B8%A5%E0%B8%B2%E0%B8%81%E0%B8%81%E0%B8%B4%E0%B8%99%E0%B9%81%E0%B8%9A%E0%B9%88%E0%B8%87%E0%B8%A3%E0%B8%B1%E0%B8%90%E0%B8%9A%E0%B8%B2%E0%B8%A5+%E0%B8%AB%E0%B8%A7%E0%B8%A2+when:1d&hl=th&gl=TH&ceid=TH:th",
 }
 
 func main() {
@@ -93,7 +93,7 @@ func processGold(ctx context.Context, g *gemini.Client, l *line.Client, today st
 
 	var summary string
 	headlines, err := news.FetchRSS(
-		"https://news.google.com/rss/search?q=gold+price+thailand+%E0%B8%97%E0%B8%AD%E0%B8%87%E0%B8%84%E0%B8%B3&hl=th&gl=TH&ceid=TH:th",
+		"https://news.google.com/rss/search?q=gold+price+thailand+%E0%B8%97%E0%B8%AD%E0%B8%87%E0%B8%84%E0%B8%B3+when:1d&hl=th&gl=TH&ceid=TH:th",
 		rssLimit,
 	)
 	switch {
@@ -157,6 +157,10 @@ func process(ctx context.Context, g *gemini.Client, l *line.Client, b briefing, 
 	headlines, err := news.FetchRSS(b.rssURL, rssLimit)
 	if err != nil {
 		log.Printf("[skip]  %s — fetch: %v", b.label, err)
+		return
+	}
+	if headlines == "ไม่พบข่าว" {
+		log.Printf("[skip]  %s — no recent news found", b.label)
 		return
 	}
 
