@@ -7,14 +7,16 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/claymorepriscilla/albert-morning-agent/internal/news"
 )
 
 func rssBody(titles ...string) string {
+	pubDate := time.Now().UTC().Format(time.RFC1123Z)
 	var items strings.Builder
 	for _, title := range titles {
-		fmt.Fprintf(&items, "<item><title>%s</title></item>", title)
+		fmt.Fprintf(&items, "<item><title>%s</title><pubDate>%s</pubDate></item>", title, pubDate)
 	}
 	return fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0"><channel><title>Test</title>%s</channel></rss>`, items.String())

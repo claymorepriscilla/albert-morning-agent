@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"time"
 
@@ -44,11 +45,21 @@ var dailyBriefings = []briefing{
 	},
 }
 
-var lotteryBriefing = briefing{
-	emoji:  "🎰",
-	label:  "ผลหวยไทย",
-	topic:  "หวยไทย",
-	rssURL: "https://news.google.com/rss/search?q=%E0%B8%9C%E0%B8%A5%E0%B8%AA%E0%B8%A5%E0%B8%B2%E0%B8%81%E0%B8%81%E0%B8%B4%E0%B8%99%E0%B9%81%E0%B8%9A%E0%B9%88%E0%B8%87%E0%B8%A3%E0%B8%B1%E0%B8%90%E0%B8%9A%E0%B8%B2%E0%B8%A5+%E0%B8%AB%E0%B8%A7%E0%B8%A2+when:1d&hl=th&gl=TH&ceid=TH:th",
+var thaiMonths = [13]string{
+	"", "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+	"กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม",
+}
+
+// lotteryRSSURL returns a Google News RSS URL scoped to the nearest Thai lottery draw date
+// (1st or 16th of the month) to avoid picking up results from previous draws.
+func lotteryRSSURL(t time.Time) string {
+	drawDay := 1
+	if t.Day() >= 16 {
+		drawDay = 16
+	}
+	q := fmt.Sprintf("ผลสลากกินแบ่งรัฐบาล %d %s %d", drawDay, thaiMonths[t.Month()], t.Year()+543)
+	v := url.Values{"q": {q}, "hl": {"th"}, "gl": {"TH"}, "ceid": {"TH:th"}}
+	return "https://news.google.com/rss/search?" + v.Encode()
 }
 
 func main() {
@@ -66,10 +77,12 @@ func main() {
 	defer geminiClient.Close()
 
 	lineClient := line.NewClient(cfg.LineAccessToken, cfg.LineUserID, cfg.Broadcast)
-	today := time.Now().In(time.FixedZone("Asia/Bangkok", 7*60*60)).Format("02/01/2006")
+	now := time.Now().In(time.FixedZone("Asia/Bangkok", 7*60*60))
+	today := now.Format("02/01/2006")
 
 	if os.Getenv("LOTTERY_ONLY") == "true" {
-		// Afternoon run — check lottery results only (no hardcoded date, rely on 24h RSS filter).
+		// Afternoon run — check lottery results only, URL scoped to the current draw date.
+		lotteryBriefing := briefing{emoji: "🎰", label: "ผลหวยไทย", topic: "หวยไทย", rssURL: lotteryRSSURL(now)}
 		processIfNewsFound(ctx, geminiClient, lineClient, lotteryBriefing, today)
 	} else {
 		for _, b := range dailyBriefings {

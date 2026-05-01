@@ -24,8 +24,8 @@ func FetchRSS(url string, limit int) (string, error) {
 		if len(lines) >= limit {
 			break
 		}
-		// Skip articles older than 24 hours when publish date is available.
-		if item.PublishedParsed != nil && item.PublishedParsed.Before(cutoff) {
+		// Skip articles with unknown publish date or older than 24 hours.
+		if item.PublishedParsed == nil || item.PublishedParsed.Before(cutoff) {
 			continue
 		}
 		lines = append(lines, "- "+item.Title)
