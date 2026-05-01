@@ -29,8 +29,8 @@ go.work.sum
 .env.*
 
 # Compiled binary
-agent
-agent.exe
+/agent
+/agent.exe
 
 # Editor/IDE
 .idea/
